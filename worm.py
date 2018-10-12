@@ -94,7 +94,7 @@ def tryCredentials(host, userName, password, sshClient):
 	# in the comments above the function
 	# declaration (if you choose to use
 	# this skeleton).
-	connection_result = ssh.connect(host, userName = userName, password = password)
+	connection_result = sshClient.connect(host, userName = userName, password = password)
 	if not connection_result:
 		return 1
 	return 0
@@ -162,10 +162,18 @@ def getHostsOnTheSameNetwork():
 	# IP addresses.
 	interface_list = netinfo.list_devs()
 	portScanner = nmap.PortScanner()
-	portScanner.scan(getMyIP(interface_list[0]), arguments='-p 22 --open')
+	x = portScanner.scan(getMyIP(interface_list[0]), arguments='-p 22 --open')
 	print interface_list
+	print "IP: "
 	print getMyIP(interface_list[0])
+	print "\n"
+	print "x: "
+	print x
+	print "\n"
 	hostInfo = portScanner.all_hosts()
+	print "hostInfo: "
+	print hostInfo
+	print "\n"
 	return hostInfo
 
 # If we are being run without a command line parameters, 
